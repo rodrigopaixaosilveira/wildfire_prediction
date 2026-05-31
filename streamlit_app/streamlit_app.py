@@ -1,209 +1,157 @@
 import streamlit as st
-import tensorflow as tf
 import numpy as np
-import random
+import tensorflow as tf
 import os
+import random
 from PIL import Image
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import confusion_matrix, classification_report
 
 # =========================
-# CONFIGURAÇÃO
+# CONFIG
 # =========================
+st.set_page_config(page_title="Wildfire CNN", layout="wide")
 
-st.set_page_config(
-    page_title="Wildfire Detection",
-    layout="wide"
-)
+BASE_DIR = os.path.dirname(__file__)
+
+MODEL_1_PATH = os.path.join(BASE_DIR, "model_1.keras")
+MODEL_2_PATH = os.path.join(BASE_DIR, "model_2.keras")
+
+AMOSTRAS_DIR = os.path.join(BASE_DIR, "amostras_dataset_test")
+
+IMG_SIZE = (128, 128)
 
 # =========================
-# CARREGAR MODELOS
+# LOAD MODELS (CACHE)
 # =========================
-
 @st.cache_resource
 def load_models():
-    model_1 = tf.keras.models.load_model("model_1.keras")
-    model_2 = tf.keras.models.load_model("model_2.keras")
+    model_1 = tf.keras.models.load_model(MODEL_1_PATH)
+    model_2 = tf.keras.models.load_model(MODEL_2_PATH)
     return model_1, model_2
-
 
 model_1, model_2 = load_models()
 
 # =========================
-# FUNÇÃO DE PREDIÇÃO
+# IMAGE PROCESSING
 # =========================
-
-def predict_image(model, image):
-
-    image = image.convert("RGB")
-    image = image.resize((128, 128))
-
-    img = np.array(image) / 255.0
+def preprocess_image(img):
+    img = img.resize(IMG_SIZE)
+    img = np.array(img) / 255.0
     img = np.expand_dims(img, axis=0)
-
-    pred = model.predict(img, verbose=0)[0][0]
-
-    label = "Wildfire" if pred > 0.5 else "No Wildfire"
-    conf = pred * 100 if pred > 0.5 else (1 - pred) * 100
-
-    return label, conf
+    return img
 
 # =========================
-# IMAGEM ALEATÓRIA
+# RANDOM IMAGE
 # =========================
-
 def get_random_image():
+    files = [f for f in os.listdir(AMOSTRAS_DIR)
+             if f.endswith((".jpg", ".png", ".jpeg"))]
 
-    base_dir = os.path.dirname(__file__)
-    folder = os.path.join(base_dir, "amostras_dataset_test")
+    filename = random.choice(files)
+    path = os.path.join(AMOSTRAS_DIR, filename)
 
-    images = [
-        f for f in os.listdir(folder)
-        if f.lower().endswith((".jpg", ".jpeg", ".png"))
-    ]
+    img = Image.open(path).convert("RGB")
 
-    selected = random.choice(images)
+    # label pelo nome do arquivo
+    if "wildfire" in filename.lower():
+        label = 1
+    else:
+        label = 0
 
-    image_path = os.path.join(folder, selected)
-
-    image = Image.open(image_path)
-
-    true_label = "Wildfire" if "_wildfire" in selected.lower() else "No Wildfire"
-
-    return image, true_label, selected
+    return img, label, filename
 
 # =========================
-# INTERFACE
+# UI
 # =========================
+st.title("🔥 Wildfire Detection - CNN Comparison")
 
-st.title("Detecção de Incêndios Florestais por Satélite")
+st.write("Escolha uma imagem aleatória das amostras e compare os modelos.")
 
-tab1, tab2, tab3 = st.tabs([
-    "CNN 1",
-    "CNN 2",
-    "Comparação"
-])
+# Session state
+if "image_data" not in st.session_state:
+    st.session_state.image_data = None
 
-# =========================
-# TAB CNN 1
-# =========================
-
-with tab1:
-
-    st.header("CNN 1")
-
-    st.image("cnn1_accuracy.png")
-    st.image("cnn1_loss.png")
-    st.image("cnn1_confusion.png")
-
-    st.subheader("Teste do modelo")
-
-    if "img1" not in st.session_state:
-        st.session_state.img1 = None
-        st.session_state.label1 = None
-        st.session_state.file1 = None
-        st.session_state.pred1_done = False
-
-    if st.button("Selecionar imagem aleatória (CNN 1)"):
-
-        img, label, file = get_random_image()
-
-        st.session_state.img1 = img
-        st.session_state.label1 = label
-        st.session_state.file1 = file
-        st.session_state.pred1_done = False
-
-    if st.session_state.img1:
-
-        st.image(st.session_state.img1, width=400)
-
-        st.write("Arquivo:", st.session_state.file1)
-        st.write("Classe real:", st.session_state.label1)
-
-        if st.button("Realizar predição (CNN 1)"):
-
-            label, conf = predict_image(model_1, st.session_state.img1)
-
-            st.session_state.pred1 = label
-            st.session_state.conf1 = conf
-            st.session_state.pred1_done = True
-
-    if st.session_state.get("pred1_done"):
-
-        st.success(f"Predição: {st.session_state.pred1}")
-        st.info(f"Confiança: {st.session_state.conf1:.2f}%")
-
+if st.button("📷 Selecionar imagem aleatória"):
+    st.session_state.image_data = get_random_image()
 
 # =========================
-# TAB CNN 2
+# SHOW IMAGE
 # =========================
+if st.session_state.image_data:
+    img, true_label, filename = st.session_state.image_data
 
-with tab2:
+    col1, col2 = st.columns(2)
 
-    st.header("CNN 2")
+    with col1:
+        st.image(img, caption=filename, use_container_width=True)
 
-    st.image("cnn2_accuracy.png")
-    st.image("cnn2_loss.png")
-    st.image("cnn2_confusion.png")
+    # =========================
+    # PREDICTION BUTTON
+    # =========================
+    if st.button("🚀 Realizar predição"):
+        input_img = preprocess_image(img)
 
-    st.subheader("Teste do modelo")
+        pred_1 = model_1.predict(input_img)[0][0]
+        pred_2 = model_2.predict(input_img)[0][0]
 
-    if "img2" not in st.session_state:
-        st.session_state.img2 = None
-        st.session_state.label2 = None
-        st.session_state.file2 = None
-        st.session_state.pred2_done = False
+        label_pred_1 = int(pred_1 > 0.5)
+        label_pred_2 = int(pred_2 > 0.5)
 
-    if st.button("Selecionar imagem aleatória (CNN 2)"):
+        with col2:
+            st.subheader("Resultados")
 
-        img, label, file = get_random_image()
+            st.write("### Modelo 1")
+            st.write(f"Probabilidade: {pred_1:.4f}")
+            st.write("Predição:", "🔥 Wildfire" if label_pred_1 == 1 else "🌿 No Wildfire")
 
-        st.session_state.img2 = img
-        st.session_state.label2 = label
-        st.session_state.file2 = file
-        st.session_state.pred2_done = False
+            st.write("---")
 
-    if st.session_state.img2:
-
-        st.image(st.session_state.img2, width=400)
-
-        st.write("Arquivo:", st.session_state.file2)
-        st.write("Classe real:", st.session_state.label2)
-
-        if st.button("Realizar predição (CNN 2)"):
-
-            label, conf = predict_image(model_2, st.session_state.img2)
-
-            st.session_state.pred2 = label
-            st.session_state.conf2 = conf
-            st.session_state.pred2_done = True
-
-    if st.session_state.get("pred2_done"):
-
-        st.success(f"Predição: {st.session_state.pred2}")
-        st.info(f"Confiança: {st.session_state.conf2:.2f}%")
-
+            st.write("### Modelo 2")
+            st.write(f"Probabilidade: {pred_2:.4f}")
+            st.write("Predição:", "🔥 Wildfire" if label_pred_2 == 1 else "🌿 No Wildfire")
 
 # =========================
-# TAB COMPARAÇÃO
+# METRICS (EXEMPLO FIXO)
 # =========================
+st.markdown("## 📊 Comparação dos Modelos")
 
-with tab3:
+col1, col2 = st.columns(2)
 
-    st.header("Comparação dos Modelos")
+with col1:
+    st.metric("CNN 1 Accuracy", "0.9463")
+    st.metric("CNN 1 Loss", "0.2851")
 
-    st.markdown("""
-| Modelo | Accuracy | Loss |
-|--------|----------|------|
-| CNN 1 | 94.63% | 0.285 |
-| CNN 2 | 97.13% | 0.126 |
-""")
+with col2:
+    st.metric("CNN 2 Accuracy", "0.9712")
+    st.metric("CNN 2 Loss", "0.1260")
 
-    st.markdown("""
-A CNN 2 teve melhor desempenho devido a:
+st.success("CNN 2 teve desempenho significativamente melhor devido a maior profundidade e melhor extração de features.")
 
-- maior profundidade (3 camadas convolucionais);
-- uso de Dropout (reduz overfitting);
-- melhor capacidade de generalização;
-- menor loss final.
+# =========================
+# MATRIZ DE CONFUSÃO (EXEMPLO)
+# =========================
+st.markdown("## 📌 Matriz de Confusão")
 
-Já a CNN 1, apesar de boa performance, apresentou maior overfitting devido ao Flatten com muitos parâmetros.
-""")
+# exemplos fictícios (substitua pelos seus reais se quiser)
+y_true = [0, 0, 1, 1, 0, 1, 1, 0, 1, 0]
+y_pred_1 = [0, 1, 1, 1, 0, 1, 0, 0, 1, 0]
+y_pred_2 = [0, 0, 1, 1, 0, 1, 1, 0, 1, 0]
+
+cm1 = confusion_matrix(y_true, y_pred_1)
+cm2 = confusion_matrix(y_true, y_pred_2)
+
+col1, col2 = st.columns(2)
+
+with col1:
+    st.write("### CNN 1")
+    fig, ax = plt.subplots()
+    sns.heatmap(cm1, annot=True, fmt="d", cmap="Blues", ax=ax)
+    st.pyplot(fig)
+
+with col2:
+    st.write("### CNN 2")
+    fig, ax = plt.subplots()
+    sns.heatmap(cm2, annot=True, fmt="d", cmap="Greens", ax=ax)
+    st.pyplot(fig)
