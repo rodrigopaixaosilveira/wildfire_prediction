@@ -4,9 +4,6 @@ import tensorflow as tf
 import os
 import random
 from PIL import Image
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import confusion_matrix, classification_report
 
 # =========================
 # CONFIG
@@ -18,12 +15,12 @@ BASE_DIR = os.path.dirname(__file__)
 MODEL_1_PATH = os.path.join(BASE_DIR, "model_1.keras")
 MODEL_2_PATH = os.path.join(BASE_DIR, "model_2.keras")
 
-AMOSTRAS_DIR = os.path.join(BASE_DIR, "amostras_dataset_test")
+AMOSTRAS_DIR = os.path.join(BASE_DIR, "amostras")
 
 IMG_SIZE = (128, 128)
 
 # =========================
-# LOAD MODELS (CACHE)
+# LOAD MODELS
 # =========================
 @st.cache_resource
 def load_models():
@@ -34,7 +31,7 @@ def load_models():
 model_1, model_2 = load_models()
 
 # =========================
-# IMAGE PROCESSING
+# IMAGE PREPROCESSING
 # =========================
 def preprocess_image(img):
     img = img.resize(IMG_SIZE)
@@ -46,8 +43,10 @@ def preprocess_image(img):
 # RANDOM IMAGE
 # =========================
 def get_random_image():
-    files = [f for f in os.listdir(AMOSTRAS_DIR)
-             if f.endswith((".jpg", ".png", ".jpeg"))]
+    files = [
+        f for f in os.listdir(AMOSTRAS_DIR)
+        if f.lower().endswith((".jpg", ".png", ".jpeg"))
+    ]
 
     filename = random.choice(files)
     path = os.path.join(AMOSTRAS_DIR, filename)
@@ -67,12 +66,15 @@ def get_random_image():
 # =========================
 st.title("🔥 Wildfire Detection - CNN Comparison")
 
-st.write("Escolha uma imagem aleatória das amostras e compare os modelos.")
+st.write("Clique para selecionar uma imagem aleatória e realizar a predição.")
 
-# Session state
+# session state init
 if "image_data" not in st.session_state:
     st.session_state.image_data = None
 
+# =========================
+# BUTTON - RANDOM IMAGE
+# =========================
 if st.button("📷 Selecionar imagem aleatória"):
     st.session_state.image_data = get_random_image()
 
@@ -88,7 +90,7 @@ if st.session_state.image_data:
         st.image(img, caption=filename, use_container_width=True)
 
     # =========================
-    # PREDICTION BUTTON
+    # PREDICTION
     # =========================
     if st.button("🚀 Realizar predição"):
         input_img = preprocess_image(img)
@@ -96,24 +98,34 @@ if st.session_state.image_data:
         pred_1 = model_1.predict(input_img)[0][0]
         pred_2 = model_2.predict(input_img)[0][0]
 
-        label_pred_1 = int(pred_1 > 0.5)
-        label_pred_2 = int(pred_2 > 0.5)
+        # labels
+        label_1 = "🔥 Wildfire" if pred_1 > 0.5 else "🌿 No Wildfire"
+        label_2 = "🔥 Wildfire" if pred_2 > 0.5 else "🌿 No Wildfire"
 
-        with col2:
-            st.subheader("Resultados")
+        # session state
+        st.session_state.label1 = label_1
+        st.session_state.conf1 = float(pred_1)
 
+        st.session_state.label2 = label_2
+        st.session_state.conf2 = float(pred_2)
+
+    # =========================
+    # SHOW RESULTS
+    # =========================
+    with col2:
+        st.subheader("Resultados")
+
+        if "conf1" in st.session_state:
             st.write("### Modelo 1")
-            st.write(f"Probabilidade: {pred_1:.4f}")
-            st.write("Predição:", "🔥 Wildfire" if label_pred_1 == 1 else "🌿 No Wildfire")
+            st.write(f"{st.session_state.label1} | Conf: {st.session_state.conf1:.2f}")
 
             st.write("---")
 
             st.write("### Modelo 2")
-            st.write(f"Probabilidade: {pred_2:.4f}")
-            st.write("Predição:", "🔥 Wildfire" if label_pred_2 == 1 else "🌿 No Wildfire")
+            st.write(f"{st.session_state.label2} | Conf: {st.session_state.conf2:.2f}")
 
 # =========================
-# METRICS (EXEMPLO FIXO)
+# METRICS
 # =========================
 st.markdown("## 📊 Comparação dos Modelos")
 
@@ -127,31 +139,7 @@ with col2:
     st.metric("CNN 2 Accuracy", "0.9712")
     st.metric("CNN 2 Loss", "0.1260")
 
-st.success("CNN 2 teve desempenho significativamente melhor devido a maior profundidade e melhor extração de features.")
-
-# =========================
-# MATRIZ DE CONFUSÃO (EXEMPLO)
-# =========================
-st.markdown("## 📌 Matriz de Confusão")
-
-# exemplos fictícios (substitua pelos seus reais se quiser)
-y_true = [0, 0, 1, 1, 0, 1, 1, 0, 1, 0]
-y_pred_1 = [0, 1, 1, 1, 0, 1, 0, 0, 1, 0]
-y_pred_2 = [0, 0, 1, 1, 0, 1, 1, 0, 1, 0]
-
-cm1 = confusion_matrix(y_true, y_pred_1)
-cm2 = confusion_matrix(y_true, y_pred_2)
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.write("### CNN 1")
-    fig, ax = plt.subplots()
-    sns.heatmap(cm1, annot=True, fmt="d", cmap="Blues", ax=ax)
-    st.pyplot(fig)
-
-with col2:
-    st.write("### CNN 2")
-    fig, ax = plt.subplots()
-    sns.heatmap(cm2, annot=True, fmt="d", cmap="Greens", ax=ax)
-    st.pyplot(fig)
+st.success(
+    "CNN 2 teve desempenho superior devido a melhor extração de features, "
+    "possivelmente por maior profundidade e melhor generalização."
+)
