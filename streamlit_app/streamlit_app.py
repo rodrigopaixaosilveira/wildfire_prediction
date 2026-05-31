@@ -125,12 +125,12 @@ if st.session_state.image_data:
 
         if "conf1" in st.session_state:
             st.write("### Modelo 1")
-            st.write(f"{st.session_state.label1} | Conf: {st.session_state.conf1:.2f}")
+            st.write(f"{st.session_state.label1}")
 
             st.write("---")
 
             st.write("### Modelo 2")
-            st.write(f"{st.session_state.label2} | Conf: {st.session_state.conf2:.2f}")
+            st.write(f"{st.session_state.label2}")
 
 
 # =========================
