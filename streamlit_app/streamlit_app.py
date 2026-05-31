@@ -15,7 +15,7 @@ BASE_DIR = os.path.dirname(__file__)
 MODEL_1_PATH = os.path.join(BASE_DIR, "model_1.keras")
 MODEL_2_PATH = os.path.join(BASE_DIR, "model_2.keras")
 
-AMOSTRAS_DIR = os.path.join(BASE_DIR, "amostras")
+AMOSTRAS_DIR = os.path.join(BASE_DIR, "amostras_dataset_test")
 
 IMG_SIZE = (128, 128)
 
