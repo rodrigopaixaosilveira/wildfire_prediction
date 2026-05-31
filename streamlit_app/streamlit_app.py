@@ -112,13 +112,8 @@ if st.session_state.image_data:
     # =========================
     # SHOW RESULTS
     # =========================
-
     with col2:
-        st.subheader("Resultados")
 
-        # =========================
-        # CLASSE REAL
-        # =========================
         if true_label == 1:
             st.info("📌 Classe real: 🔥 Wildfire")
         else:
@@ -126,9 +121,8 @@ if st.session_state.image_data:
 
         st.write("---")
 
-        # =========================
-        # RESULTADOS DO MODELO
-        # =========================
+        st.subheader("Resultados")
+
         if "conf1" in st.session_state:
             st.write("### Modelo 1")
             st.write(f"{st.session_state.label1} | Conf: {st.session_state.conf1:.2f}")
@@ -137,6 +131,7 @@ if st.session_state.image_data:
 
             st.write("### Modelo 2")
             st.write(f"{st.session_state.label2} | Conf: {st.session_state.conf2:.2f}")
+
 
 # =========================
 # METRICS
