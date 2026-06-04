@@ -54,10 +54,10 @@ def get_random_image():
     img = Image.open(path).convert("RGB")
 
     # label pelo nome do arquivo
-    if "wildfire" in filename.lower():
-        label = 1
-    else:
+    if "nowildfire" in filename.lower():
         label = 0
+    else:
+        label = 1
 
     return img, label, filename
 
